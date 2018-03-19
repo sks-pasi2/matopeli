@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>wormpeli</title>
+    <style>
+    	* { padding: 0; margin: 0; }
+    	canvas { background: #eee; display: block; margin: 0}
+    </style>
+
+</head>
+<body>
+<div>
+  <canvas id="Canvas" width="360" height="150"></canvas>
+</div>
+<div id="buttons">
+  <button id="Start" onclick="StartGame()">Start New Game</button>
+  <button id="Save" onclick="Save()">Save</button>
+  <button id="Load" onclick="RequestLoad()">Load</button>
+  <button id="Pause" onclick="Pause()">Pause</button>
+  <button id="SubmitScore" onclick="SubmitScore()">Submit Score</button>
+  <span  id="score">1</span>
+</div>
+
+<script>
+
+  var canvas = document.getElementById("Canvas");
+  //var starbutton = document.getElementById("Start");
+  var ctx = canvas.getContext("2d");
+  var SIZE = 10;
+  var dx = SIZE;
+  var dy = 0;
+  var block = {xx:-10, yy:-10};
+  var worm = [block];
+  var timer = null;
+  var gameOn = false;
+  var food = {xx:-10, yy:-10};
+  //newFood();
+
+  ctx.beginPath();
+  var x = worm[0].xx;
+  var y = worm[0].yy;
+  ctx.rect(x, y, SIZE, SIZE);
+  ctx.fillStyle = "#FF0000";
+  ctx.fill();
+  ctx.closePath();
+  document.getElementById("Pause").disabled = true;
+  document.getElementById("Save").disabled = true;
+  document.getElementById("SubmitScore").disabled = true;
+
+
+  function StartGame(){
+    clearInterval(timer);
+    document.getElementById("Pause").firstChild.data = "Pause";
+    document.getElementById("Load").disabled = true;
+    document.getElementById("Pause").disabled = false;
+    document.getElementById("SubmitScore").disabled = true;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    dx = SIZE;
+    dy = 0;
+    var startX = 150;
+    var startY = 70;
+    block = {xx:startX, yy:startY};
+    worm = [block];
+    newFood();
+    timer = setInterval(draw, 100);
+    gameOn = true;
+    document.getElementById("score").textContent = "1";
+  }
+
+  function Pause(){
+    var elem = document.getElementById("Pause");
+    if ( elem.firstChild.data == "Pause" ){
+      clearInterval(timer);
+      gameOn = false;
+      elem.firstChild.data = "Resume";
+      document.getElementById("Save").disabled = false;
+    }
+    else {
+      timer = setInterval(draw, 100);
+      gameOn = true;
+      elem.firstChild.data = "Pause";
+      document.getElementById("Save").disabled = true;
+      document.getElementById("Load").disabled = true;
+    }
+
+  }
+  function Save() {
+    var msg = {
+      "messageType": "SAVE",
+      "gameState": {
+        "worm": worm,
+        "food": food,
+        "dirx": dx,
+        "diry": dy
+      }
+    };
+    window.parent.postMessage(msg, "*");
+  }
+  function SubmitScore() {
+    var msg = {
+      "messageType": "SCORE",
+      "score": worm.length
+    };
+    window.parent.postMessage(msg, "*");
+  }
+
+  function RequestLoad() {
+    var msg = {
+      "messageType": "LOAD_REQUEST",
+    };
+    window.parent.postMessage(msg, "*");
+
+  }
+
+  function gameOver() {
+    clearInterval(timer);
+    gameOn = false;
+    window.alert("Game Over");
+    document.getElementById("Save").disabled = true;
+    document.getElementById("Load").disabled = false;
+    document.getElementById("SubmitScore").disabled = false;
+    document.getElementById("Pause").disabled = true;
+
+  }
+
+  function move() {
+    var i;
+    var wormlength = worm.length - 1;
+    for (i = wormlength; i > 0; --i){
+      var next = i-1;
+      worm[i].xx = worm[next].xx ;
+      worm[i].yy = worm[next].yy ;
+    }
+    worm[0].xx = worm[0].xx + dx;
+    worm[0].yy = worm[0].yy + dy;
+
+    if (worm[0].xx < 0){
+      worm[0].xx = canvas.width - SIZE;
+    }
+    if (worm[0].xx >= canvas.width){
+      worm[0].xx = 0;
+    }
+    if (worm[0].yy < 0){
+      worm[0].yy = canvas.height - SIZE;
+    }
+    if (worm[0].yy >= canvas.height){
+      worm[0].yy = 0;
+    }
+
+  }
+
+  function randomize(){
+    var randx = Math.floor(Math.random() * ((canvas.width - SIZE)) + 1);
+    var randy = Math.floor(Math.random() * ((canvas.height - SIZE)) + 1);
+
+    food.xx = randx;
+    food.yy = randy;
+
+  }
+  function newFood(){
+
+    var ok = false;
+    while(ok == false){
+      randomize();
+      for (i = 0; i < worm.length; ++i){
+        ok = true;
+        if(collission(i)){
+          ok = false;
+          break;
+        }
+      }
+    }
+    drawFood();
+
+  }
+
+  function drawFood() {
+    ctx.beginPath();
+    ctx.rect(food.xx, food.yy, SIZE, SIZE);
+    ctx.fillStyle = "#FF6600";
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function check() {
+    var i;
+    for (i = 1; i < worm.length; ++i){
+      if(worm[0].xx == worm[i].xx && worm[0].yy == worm[i].yy){
+        gameOver();
+      }
+    }
+  }
+
+  function collission( index ){
+    if(worm[index].xx >= food.xx && worm[index].xx <= food.xx + SIZE){
+      if(worm[index].yy >= food.yy && worm[index].yy <= food.yy + SIZE){
+        return true;
+      }
+    }
+    if(worm[index].xx +SIZE >= food.xx && worm[index].xx+SIZE <= food.xx + SIZE){
+      if(worm[index].yy >= food.yy && worm[index].yy <= food.yy + SIZE){
+        return true;
+      }
+    }
+    if(worm[index].xx >= food.xx && worm[index].xx <= food.xx + SIZE){
+      if(worm[index].yy+SIZE >= food.yy && worm[index].yy+SIZE <= food.yy + SIZE){
+        return true;
+      }
+    }
+    if(worm[index].xx+SIZE >= food.xx && worm[index].xx+SIZE <= food.xx + SIZE){
+      if(worm[index].yy+SIZE >= food.yy && worm[index].yy+SIZE <= food.yy + SIZE){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function addTail() {
+    var newBlock={xx:-10, yy:-10};
+    worm.push(newBlock);
+    document.getElementById("score").textContent = worm.length.toString();
+  }
+
+  function drawWorm() {
+    for (i = 0; i < worm.length; ++i){
+      ctx.beginPath();
+      var x = worm[i].xx;
+      var y = worm[i].yy;
+      ctx.rect(x, y, SIZE -1, SIZE-1);
+      ctx.fillStyle = "#FF0000";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+  }
+  function clear() {
+    for (i = 0; i < worm.length; ++i){
+      ctx.clearRect(worm[i].xx, worm[i].yy, SIZE, SIZE);
+    }
+  }
+  function draw() {
+    clear();
+    move();
+    check();
+    if(collission(0)){
+      addTail();
+      ctx.clearRect(food.xx, food.yy, SIZE, SIZE);
+      newFood();
+    }
+    drawWorm();
+  }
+  document.addEventListener("keydown", keyDownHandler, false);
+
+  function keyDownHandler(e) {
+      e.preventDefault();
+      if(e.keyCode == 39) {
+        if(dx != -SIZE){
+          dx = SIZE;
+          dy = 0;
+        }
+      }
+      else if(e.keyCode == 37) {
+        if(dx != SIZE){
+          dx = -SIZE;
+          dy = 0;
+        }
+      }
+      if(e.keyCode == 38) {
+        if(dy != SIZE){
+          dx = 0;
+          dy = -SIZE;
+        }
+      }
+      else if(e.keyCode == 40) {
+        if(dy != -SIZE){
+          dx = 0;
+          dy = SIZE;
+        }
+      }
+      if(gameOn == true){
+        draw();
+      }
+  }
+  var message =  {
+    messageType: "SETTING",
+    options: {
+      "width": 360,
+      "height": 170
+      }
+  };
+  window.parent.postMessage(message, "*");
+
+  window.addEventListener("message", function(evt) {
+    if(evt.data.messageType === "LOAD") {
+      worm = evt.data.gameState.worm;
+      food = evt.data.gameState.food;
+      dx = evt.data.gameState.dirx;
+      dy = evt.data.gameState.diry;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawWorm();
+      drawFood();
+      document.getElementById("score").textContent = worm.length.toString();
+      document.getElementById("Pause").disabled = false;
+      document.getElementById("Pause").firstChild.data = "Resume";
+      document.getElementById("Load").disabled = true;
+      document.getElementById("SubmitScore").disabled = true;
+
+
+    } else if (evt.data.messageType === "ERROR") {
+      alert(evt.data.info);
+    }
+  });
+
+</script>
+
+</body>
+</html>
